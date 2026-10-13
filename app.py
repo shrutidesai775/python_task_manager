@@ -1,8 +1,12 @@
 import sqlite3
+import re
+
+
+DATABASE = "data.db"
 
 
 def connect_db():
-    return sqlite3.connect("data.db")
+    return sqlite3.connect(DATABASE)
 
 
 def create_table():
@@ -21,41 +25,75 @@ def create_table():
     conn.close()
 
 
+def is_valid_email(email):
+    pattern = r"^[^@\s]+@[^@\s]+\.[^@\s]+$"
+    return re.match(pattern, email) is not None
+
+
 def add_record():
     name = input("Enter name: ").strip()
     email = input("Enter email: ").strip().lower()
 
-    # Validate empty inputs
+    # Validate input
     if not name or not email:
         print("Error: Name and email cannot be empty.")
         return
 
-    # Basic email validation
-    if "@" not in email or "." not in email.split("@")[-1]:
+    if not is_valid_email(email):
         print("Error: Please enter a valid email.")
         return
 
     conn = connect_db()
     cursor = conn.cursor()
 
-    # Check for duplicate name or email
+    # Check for an existing email first
     cursor.execute(
-        "SELECT id FROM records WHERE name = ? OR email = ?",
-        (name, email)
+        "SELECT id, name, email FROM records WHERE email = ?",
+        (email,)
     )
+    existing_email = cursor.fetchone()
 
-    existing = cursor.fetchone()
-
-    if existing:
+    if existing_email:
         print("Classification: REDUNDANT DATA")
-        print("Duplicate record detected! Data was not added.")
+        print("This email already exists. Record was not added.")
+        conn.close()
+        return
+
+    # Check whether the name already exists
+    cursor.execute(
+        "SELECT id, name, email FROM records WHERE name = ?",
+        (name,)
+    )
+    existing_name = cursor.fetchone()
+
+    if existing_name:
+        print("Possible duplicate detected: same name.")
+
+        confirm = input(
+            "Is this a different person? (yes/no): "
+        ).strip().lower()
+
+        if confirm == "yes":
+            cursor.execute(
+                "INSERT INTO records (name, email) VALUES (?, ?)",
+                (name, email)
+            )
+            conn.commit()
+
+            print("Classification: FALSE POSITIVE")
+            print("Record added after user confirmation.")
+
+        else:
+            print("Classification: REDUNDANT DATA")
+            print("Record was not added.")
+
     else:
         cursor.execute(
             "INSERT INTO records (name, email) VALUES (?, ?)",
             (name, email)
         )
-
         conn.commit()
+
         print("Classification: UNIQUE DATA")
         print("Unique record added successfully!")
 
@@ -66,14 +104,18 @@ def view_records():
     conn = connect_db()
     cursor = conn.cursor()
 
-    cursor.execute("SELECT * FROM records")
+    cursor.execute("SELECT id, name, email FROM records")
     records = cursor.fetchall()
 
     if records:
         print("\n--- Stored Records ---")
 
         for record in records:
-            print(record)
+            print(
+                f"ID: {record[0]} | "
+                f"Name: {record[1]} | "
+                f"Email: {record[2]}"
+            )
     else:
         print("No records found.")
 
@@ -93,11 +135,14 @@ def main():
 
         if choice == "1":
             add_record()
+
         elif choice == "2":
             view_records()
+
         elif choice == "3":
             print("Exiting program.")
             break
+
         else:
             print("Invalid choice. Please select 1, 2, or 3.")
 
