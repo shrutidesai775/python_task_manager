@@ -1,4 +1,5 @@
-CodeAlpha Data Redundancy Removal System
+Title
+Data Redundancy Removal System
 
 Project Description
 
