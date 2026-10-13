@@ -1,79 +1,106 @@
 import sqlite3
 
+
 def connect_db():
     return sqlite3.connect("data.db")
 
-def add_task():
-    task = input("Enter task name: ")
 
+def create_table():
     conn = connect_db()
     cursor = conn.cursor()
 
-    cursor.execute(
-        "INSERT INTO tasks (task_name) VALUES (?)",
-        (task,)
-    )
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS records (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT NOT NULL,
+            email TEXT NOT NULL UNIQUE
+        )
+    """)
 
     conn.commit()
     conn.close()
 
-    print("Task added successfully!")
 
-def view_tasks():
-    conn = connect_db()
-    cursor = conn.cursor()
+def add_record():
+    name = input("Enter name: ").strip()
+    email = input("Enter email: ").strip().lower()
 
-    cursor.execute("SELECT * FROM tasks")
-    tasks = cursor.fetchall()
+    # Validate empty inputs
+    if not name or not email:
+        print("Error: Name and email cannot be empty.")
+        return
 
-    print("\n--- Your Tasks ---")
-
-    for task in tasks:
-        print(task[0], "-", task[1])
-
-    conn.close()
-
-def delete_task():
-    view_tasks()
-
-    task_id = input("Enter task ID to delete: ")
+    # Basic email validation
+    if "@" not in email or "." not in email.split("@")[-1]:
+        print("Error: Please enter a valid email.")
+        return
 
     conn = connect_db()
     cursor = conn.cursor()
 
+    # Check for duplicate name or email
     cursor.execute(
-        "DELETE FROM tasks WHERE id = ?",
-        (task_id,)
+        "SELECT id FROM records WHERE name = ? OR email = ?",
+        (name, email)
     )
 
-    if cursor.rowcount > 0:
-        print("Task deleted successfully!")
+    existing = cursor.fetchone()
+
+    if existing:
+        print("Classification: REDUNDANT DATA")
+        print("Duplicate record detected! Data was not added.")
     else:
-        print("Task ID not found!")
+        cursor.execute(
+            "INSERT INTO records (name, email) VALUES (?, ?)",
+            (name, email)
+        )
 
-    conn.commit()
-    conn.close()    
+        conn.commit()
+        print("Classification: UNIQUE DATA")
+        print("Unique record added successfully!")
+
+    conn.close()
+
+
+def view_records():
+    conn = connect_db()
+    cursor = conn.cursor()
+
+    cursor.execute("SELECT * FROM records")
+    records = cursor.fetchall()
+
+    if records:
+        print("\n--- Stored Records ---")
+
+        for record in records:
+            print(record)
+    else:
+        print("No records found.")
+
+    conn.close()
+
 
 def main():
-    while True:
-        print("\n1. Add Task")
-        print("2. View Tasks")
-        print("3. delete task")
-        print("4.Exit")
+    create_table()
 
-        choice = input("Enter your choice: ")
+    while True:
+        print("\n--- Data Redundancy Removal System ---")
+        print("1. Add record")
+        print("2. View records")
+        print("3. Exit")
+
+        choice = input("Enter your choice: ").strip()
 
         if choice == "1":
-            add_task()
+            add_record()
         elif choice == "2":
-            view_tasks()
+            view_records()
         elif choice == "3":
-            delete_task()
-        elif choice == "4":
-            print("Thank you!")
+            print("Exiting program.")
             break
         else:
-            print("Invalid choice!")
+            print("Invalid choice. Please select 1, 2, or 3.")
+
 
 if __name__ == "__main__":
     main()
